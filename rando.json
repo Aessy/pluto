@@ -1,0 +1,23 @@
+{
+    "name" : "Super Metroid Any%",
+    "splits" : [
+        {
+            "name" : "BOSS 1"
+        },
+        {
+            "name" : "BOSS 2"
+        },
+        {
+            "name" : "BOSS 3"
+        },
+        {
+            "name" : "BOSS 4"
+        },
+        {
+            "name" : "MB1"
+        },
+        {
+            "name" : "HOME"
+        }
+    ]
+}
