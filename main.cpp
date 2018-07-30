@@ -13,7 +13,8 @@
 #include <nana/gui/timer.hpp>
 #include <nana/gui/widgets/panel.hpp>
 
-struct input_event {
+struct input_event
+{
       struct timeval time;
       unsigned short type;
       unsigned short code;
@@ -52,24 +53,6 @@ int read_input(T callback)
         {
             callback(static_cast<Key>(event.code));
         }
-        /*
-
-        if (event.type == 1)
-        {
-            if (event.value == 1)
-            {
-                std::cout << event.code << " Key down\n";
-            }
-            else if (event.value == 0)
-            {
-                std::cout << event.code << " Key up\n";
-            }
-            else if (event.value == 2)
-            {
-                std::cout << event.code << " Key is down\n";
-            }
-        }
-        */
     }
 }
 
@@ -109,7 +92,7 @@ auto mainClockToStr(int ms)
     return os.str();
 }
 
-auto microSecToStr(int ms, bool add_ms = true)
+auto msToStr(int ms, bool add_ms = true)
 {
     auto const minutes = ms / 1000 / 60;
     if (minutes)
@@ -200,7 +183,7 @@ struct TimeRow : public nana::panel<false>
         diff_lbl.caption("");
 
         time.format(true);
-        time.caption(createCaption(format, microSecToStr(split.segment_time, false)));
+        time.caption(createCaption(format, msToStr(split.segment_time, false)));
     };
 
     void update_diff(int ms, bool ignore_diff = false)
@@ -254,7 +237,7 @@ struct TimeRow : public nana::panel<false>
                 }
             }
 
-            time.caption(createCaption(format, microSecToStr(split.new_segment_time, false)));
+            time.caption(createCaption(format, msToStr(split.new_segment_time, false)));
 
         }
 
@@ -274,7 +257,7 @@ struct TimeRow : public nana::panel<false>
 
         name.caption(createCaption(format, split.name));
         diff_lbl.caption("");
-        time.caption(createCaption(format, microSecToStr(split.segment_time, false)));
+        time.caption(createCaption(format, msToStr(split.segment_time, false)));
     }
 
     nana::place place;
@@ -285,24 +268,107 @@ struct TimeRow : public nana::panel<false>
     nana::label time;
 };
 
-auto getLabels(nana::window window, nana::place & place,  std::vector<Split> const& splits)
+enum class State
 {
-    std::vector<std::shared_ptr<TimeRow>> rows;
+    RUNNING,
+    FINISH,
+    IDLE
+};
 
-    for (auto const& split : splits)
+struct Run : public nana::panel<true>
+{
+    Run(nana::window window)
+        : nana::panel<true>{window}
+        , place{*this}
     {
-        auto row = std::make_shared<TimeRow>(window, split);
-        place["abc"] << *row;
-        rows.push_back(row);
+        place.div("<vertical abc>");
     }
 
-    return rows;
-}
+    void initSplits(std::vector<Split> const& splits)
+    {
+        this->rows.clear();
 
-void func(nana::arg_mouse const& m)
-{
-    std::cout << "tmp\n";
-}
+        for (auto const& split : splits)
+        {
+            auto row = std::make_shared<TimeRow>(*this, split);
+            place["abc"] << *row;
+            rows.push_back(row);
+        }
+
+        current_row = rows.begin();
+    }
+
+
+    void start()
+    {
+        current_row = rows.begin();
+        (*current_row)->start();
+    }
+
+    bool split(int e)
+    {
+        auto previous_split = (current_row > rows.begin()) ? (*(current_row-1))->split.new_segment_time : 0;
+        (*current_row)->finish(e, previous_split);
+
+        if (current_row + 1 == rows.end())
+        {
+            return true;
+        }
+        else 
+        {
+            ++current_row;
+            (*current_row)->start();
+            return false;
+        }
+    }
+
+    void clear()
+    {
+        for (auto & row : rows)
+        {
+            row->clear();
+        }
+        current_row = rows.begin();
+    }
+
+    void clearCurrent()
+    {
+        if (current_row != rows.begin())
+        {
+            (*current_row)->clear();
+            --current_row;
+            (*current_row)->clear();
+            (*current_row)->start();
+        }
+    }
+
+    void clearNext()
+    {
+        if (current_row + 1 < rows.end())
+        {
+            (*current_row)->finish(-1);
+            ++current_row;
+            (*current_row)->start();
+        }
+    }
+
+    int bestPossibleTime(int e = 0)
+    {
+        return std::accumulate(current_row, rows.end(), 0, [](int sum, auto row) {return sum + row->split.best_segment;});
+    };
+
+    void refresh(int e)
+    {
+        (*current_row)->update_diff(e);
+    }
+
+public:
+
+    nana::place place;
+
+    std::vector<std::shared_ptr<TimeRow>> rows;
+    std::vector<std::shared_ptr<TimeRow>>::iterator current_row = rows.begin();
+};
 
 int main()
 {
@@ -326,23 +392,11 @@ int main()
 
     using namespace std::chrono_literals;
 
-    Split split;
-
     nana::form fm;
     fm.bgcolor(nana::colors::black);
 
     nana::place plc(fm);
     plc.div("<vertical margin=10 <abc weight=70%><clock weight=20%><best_time weight=20%>>");
-
-
-    nana::panel<true> times(fm);
-    // times.bgcolor(nana::colors::black);
-
-
-    nana::place times_place(times);
-    times_place.div("<vertical abc>");
-    auto rows = getLabels(times, times_place, splits);
-
 
     nana::label clock(fm);
     clock.format(true);
@@ -356,33 +410,23 @@ int main()
     auto set_best_possible_time = [&best_time](int ms)
     {
         std::string const label = "Best possible time: ";
-        best_time.caption(createCaption(format, label + microSecToStr(ms)));
+        best_time.caption(createCaption(format, label + msToStr(ms)));
     };
 
+    Run run{fm};
+    run.initSplits(splits);
 
-    plc["abc"] << times;
+    plc["abc"] << run;
     plc["clock"] << clock;
     plc["best_time"] << best_time;
-
 
     nana::timer timer;
     timer.interval(20);
     timer.start();
 
-
     std::vector<Key> event_queue;
-
-    enum class State
-    {
-        RUNNING,
-        FINISH,
-        IDLE
-    };
-
     auto start_clock = std::chrono::system_clock::now();
-    auto current_row = rows.begin();
-    int best_possible_time = std::accumulate(rows.begin(), rows.end(), 0, [](int sum, auto row) {return sum + row->split.best_segment;});
-    set_best_possible_time(best_possible_time);
+    set_best_possible_time(run.bestPossibleTime());
     State state = State::IDLE;
 
     auto add_event = [&](auto key)
@@ -391,7 +435,6 @@ int main()
     };
 
     std::thread t(read_input<decltype(add_event)>, add_event);
-
 
     timer.elapse(
             [&](){
@@ -404,95 +447,52 @@ int main()
 
                     if (key == Key::SPACE)
                     {
-                        if (state == State::IDLE)
+                        switch(state)
                         {
-                            std::cout << "Starting\n";
-                            state = State::RUNNING;
-                            start_clock = std::chrono::system_clock::now();
-                            best_possible_time = std::accumulate(rows.begin(), rows.end(), 0, [](int sum, auto row) {return sum + row->split.best_segment;});
-                            set_best_possible_time(best_possible_time);
-                            current_row = rows.begin();
-                            (*current_row)->start();
-                            return;
-                        }
-                        else if (state == State::RUNNING)
-                        {
-                            auto previous_split = (current_row > rows.begin()) ? (*(current_row-1))->split.new_segment_time : 0;
-                            (*current_row)->finish(e, previous_split);
-
-                            if (current_row + 1 == rows.end())
+                            case State::IDLE:
                             {
-                                state = State::FINISH;
+                                state = State::RUNNING;
+                                start_clock = std::chrono::system_clock::now();
+                                run.start();
+                                break;
                             }
-                            else 
+                            case State::RUNNING:
                             {
-                                ++current_row;
+                                state = run.split(e) ? State::FINISH
+                                                     : State::RUNNING;
 
-                                best_possible_time = std::accumulate(current_row, rows.end(), 0, [](int sum, auto row) {return sum + row->split.best_segment;});
-                                best_possible_time += e;
-                                set_best_possible_time(best_possible_time);
-
-                                (*current_row)->start();
+                                break;
                             }
-                        }
-                        else if (state == State::FINISH)
-                        {
-                            state = State::IDLE;
-                            for (auto & row : rows)
+                            case State::FINISH:
                             {
-                                row->clear();
+                                state = State::IDLE;
+                                run.clear();
+                                clock.caption(createCaption(format_timer, "00:00:00"));
+                                break;
                             }
-                            clock.caption(createCaption(format_timer, "00:00:00"));
-                        }
+                        };
                     }
                     else if (key == Key::UP && state == State::RUNNING)
                     {
-                        if (current_row > rows.begin())
-                        {
-                            (*current_row)->clear();
-                            --current_row;
-                            (*current_row)->clear();
-                            (*current_row)->start();
-
-                            best_possible_time = std::accumulate(current_row, rows.end(), 0, [](int sum, auto row) {return sum + row->split.best_segment;});
-                            best_possible_time += e;
-                            set_best_possible_time(best_possible_time);
-                        }
+                        run.clearCurrent();
                     }
                     else if (key == Key::DOWN && state == State::RUNNING)
                     {
-                        if (current_row + 1 < rows.end())
-                        {
-                            (*current_row)->finish(-1);
-                            ++current_row;
-                            (*current_row)->start();
-
-                            best_possible_time = std::accumulate(current_row, rows.end(), 0, [](int sum, auto row) {return sum + row->split.best_segment;});
-                            best_possible_time += e;
-                            set_best_possible_time(best_possible_time);
-                        }
+                        run.clearNext();
                     }
                     else if (key == Key::BACKSPACE && (state == State::RUNNING || state == State::FINISH))
                     {
                         state = State::IDLE;
-                        for (auto & row : rows)
-                        {
-                            row->clear();
-                        }
-
-                        best_possible_time = std::accumulate(rows.begin(), rows.end(), 0, [](int sum, auto row) {return sum + row->split.best_segment;});
-                        set_best_possible_time(best_possible_time);
+                        run.clear();
                         clock.caption(createCaption(format_timer, "00:00:00"));
                     }
-                }
 
+                    set_best_possible_time(run.bestPossibleTime(e));
+                }
                 if (state == State::RUNNING)
                 {
                     clock.caption(createCaption(format_timer, mainClockToStr(e)));
-                    for (auto & row : rows)
-                    {
-                        (*current_row)->update_diff(e);
-                    }
+                    run.refresh(e);
                 }
             });
 
