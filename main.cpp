@@ -7,11 +7,19 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <fstream>
 
 #include <nana/gui/wvl.hpp>
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/timer.hpp>
 #include <nana/gui/widgets/panel.hpp>
+
+#include <boost/hana.hpp>
+
+#include "httplib.h"
+
+#include "json11.hpp"
+#include "json.hpp"
 
 struct input_event
 {
@@ -29,41 +37,27 @@ enum class Key : unsigned short
     BACKSPACE = 14,
 };
 
-template<typename T>
-int read_input(T callback)
-{
-    int fd = open("/dev/input/by-id/usb-Logitech_Gaming_Keyboard_G810_1673364D3933-event-kbd", O_RDWR | O_NOCTTY | O_NDELAY);
-    if (fd == -1) {
-        std::cout << "Failed to open\n";
-        return -1;
-    }
-
-    fcntl(fd, F_SETFL, 0);
-
-    for (;;)
-    {
-        input_event event;
-        auto const n = read(fd, &event, sizeof(event));
-        if (n < 0) {
-            std::cout << "Failed to read:" << n << "\n";
-            return -1;
-        }
-
-        if ((event.code == 14 || event.code == 57 || event.code == 108 || event.code == 103) && event.type == 1 && event.value == 1)
-        {
-            callback(static_cast<Key>(event.code));
-        }
-    }
-}
-
 struct Split
 {
-    std::string name;
-    int segment_time;
-    int best_segment = -1;
+    BOOST_HANA_DEFINE_STRUCT(Split,
+    (std::string, name),
+    (std::string, key),
+    (int, segment_time),
+    (int, best_segment)
+    );
+
     int new_best_segment = -1;
     int new_segment_time = -1;
 };
+
+struct Game
+{
+    BOOST_HANA_DEFINE_STRUCT(Game,
+    (std::string, name),
+    (std::vector<Split>, splits)
+    );
+};
+
 
 auto mainClockToStr(int ms)
 {
@@ -148,42 +142,62 @@ std::string createCaption(std::string const& format, std::string const& caption)
     return format + caption + "</>";
 }
 
-std::string const format = "<bold color=0x9933ff font=\"Consolas\" size=15 center>";
+std::string const format = "<color=0x093747 font=\"Inconsolata\" size=15 center>";
 std::string const format_pluss = "<bold color=0x990033 font=\"Consolas\" size=15 center>";
 std::string const format_minus = "<bold color=0x009900 font=\"Consolas\" size=15 center>";
 std::string const format_gray = "<bold color=0x595959 font=\"Consolas\" size=15 center>";
 std::string const format_gold = "<bold color=0xffff66 font=\"Consolas\" size=15 center>";
 
-struct TimeRow : public nana::panel<false>
+struct TimeRow : public nana::panel<true>
 {
     TimeRow(nana::window window, Split const& split)
-        : nana::panel<false> { window }
+        : nana::panel<true> { window }
         , place { *this }
         , split { split }
         , name { *this }
         , diff_lbl { *this }
         , time { *this }
+        , fill { *this }
     {
-        this->bgcolor(nana::colors::blue);
-        place.div("<abc weight=50%><diff weight=25%><time weight=25%>");
+        this->transparent(false);
+        this->bgcolor(nana::colors::black);
+
+        fill.transparent(false);
+        fill.bgcolor(nana::color{static_cast<nana::color_rgb>(0x0b0f0c)});
+
+        place.div("vert<margin=[0,5,0,5] weight=99% <abc weight=50%><diff weight=25%><time weight=25%>>"
+                       "<test weight=1%>");
         place.field("abc") << name;
         place.field("diff") << diff_lbl;
         place.field("time") << time;
+        place.field("test") << fill;
+
+        name.transparent(true);
+        diff_lbl.transparent(true);
+        time.transparent(true);
 
         diff_lbl.fgcolor(nana::colors::blue);
         time.fgcolor(nana::colors::blue);
 
-        diff_lbl.text_align(nana::align::right);
-        time.text_align(nana::align::right);
+        diff_lbl.text_align(nana::align::right, nana::align_v::center);
+        time.text_align(nana::align::right, nana::align_v::center);
 
         name.format(true);
         name.caption(createCaption(format, split.name));
+        name.text_align(nana::align::left, nana::align_v::center);
 
         diff_lbl.format(true);
         diff_lbl.caption("");
 
         time.format(true);
-        time.caption(createCaption(format, msToStr(split.segment_time, false)));
+        if (split.segment_time == -1)
+        {
+            time.caption(createCaption(format_gray, "-"));
+        }
+        else
+        {
+            time.caption(createCaption(format, msToStr(split.segment_time, false)));
+        }
     };
 
     void update_diff(int ms, bool ignore_diff = false)
@@ -207,9 +221,7 @@ struct TimeRow : public nana::panel<false>
 
     void start()
     {
-        this->name.bgcolor(nana::color{static_cast<nana::color_rgb>(0x112233)});
-        this->diff_lbl.bgcolor(nana::color{static_cast<nana::color_rgb>(0x112233)});
-        this->time.bgcolor(nana::color{static_cast<nana::color_rgb>(0x112233)});
+        this->bgcolor(nana::color{static_cast<nana::color_rgb>(0x0d111e)});
     }
 
     void finish(int ms, int previous_segment_time = -1)
@@ -230,7 +242,7 @@ struct TimeRow : public nana::panel<false>
             if (previous_segment_time != -1)
             {
                 auto new_segment_time = ms - previous_segment_time;
-                if (new_segment_time < (unsigned int)split.best_segment)
+                if (split.best_segment == -1 || new_segment_time < (unsigned int)split.best_segment)
                 {
                     split.new_best_segment = new_segment_time;
                     format = format_gold;
@@ -241,17 +253,13 @@ struct TimeRow : public nana::panel<false>
 
         }
 
-        this->name.bgcolor(nana::colors::black);
-        this->diff_lbl.bgcolor(nana::colors::black);
-        this->time.bgcolor(nana::colors::black);
+        this->bgcolor(nana::colors::black);
         update_diff(ms, true);
     }
 
     void clear()
     {
-        this->name.bgcolor(nana::colors::black);
-        this->diff_lbl.bgcolor(nana::colors::black);
-        this->time.bgcolor(nana::colors::black);
+        this->bgcolor(nana::colors::black);
 
         split.new_segment_time = -1;
 
@@ -266,6 +274,7 @@ struct TimeRow : public nana::panel<false>
     nana::label name;
     nana::label diff_lbl;
     nana::label time;
+    nana::label fill;
 };
 
 enum class State
@@ -282,6 +291,7 @@ struct Run : public nana::panel<true>
         , place{*this}
     {
         place.div("<vertical abc>");
+        this->bgcolor(nana::colors::blue);
     }
 
     void initSplits(std::vector<Split> const& splits)
@@ -370,24 +380,22 @@ public:
     std::vector<std::shared_ptr<TimeRow>>::iterator current_row = rows.begin();
 };
 
+
+
+template<typename T>
+auto load_splits(std::string const& path)
+{
+    std::ifstream f(path);
+    std::string s((std::istreambuf_iterator<char>(f)),
+                   std::istreambuf_iterator<char>());
+
+    return fromJson<T>(s);
+}
+
+
 int main()
 {
-
-    std::vector<Split> splits { 
-        {"Bomb", 302000  , 298000},
-        {"Varia",651000 , 325000},
-        {"Speed",869000 , 210000},
-        {"PB",   1092000, 206000},
-        {"Ghost", 1244000, 147000},
-        {"Gravity",1407000, 156000},
-        {"Batwoon", 1620000 , 196000},
-        {"Draygon", 1760000, 116000},
-        {"LN Ele", 2107000, 339000},
-        {"Bird no fly", 2284000, 211000},
-        {"G4", 2641000, 321000},
-        {"MB HEAD", 2907000 , 244000},
-        {"Finito",  3173000,265000 }
-    };
+    auto game = load_splits<Game>("sm_any_kpdr.json");
 
 
     using namespace std::chrono_literals;
@@ -414,7 +422,7 @@ int main()
     };
 
     Run run{fm};
-    run.initSplits(splits);
+    run.initSplits(game.splits);
 
     plc["abc"] << run;
     plc["clock"] << clock;
@@ -429,12 +437,46 @@ int main()
     set_best_possible_time(run.bestPossibleTime());
     State state = State::IDLE;
 
-    auto add_event = [&](auto key)
+    std::thread t([&]()
     {
-        event_queue.push_back(key);
-    };
+        httplib::Client cli("localhost", 8080);
+        while(1)
+        {
+            if (state == State::IDLE)
+            {
+                auto res = cli.Get("/game_started");
+                if (res && res->status == 200)
+                {
+                    state = State::RUNNING;
+                    start_clock = std::chrono::system_clock::now();
+                    run.start();
+                }
+            }
+            else if (state == State::RUNNING)
+            {
+                auto res = cli.Get("/state");
+                if (res && res->status == 200)
+                {
+                    auto body = res->body;
+                    std::string err;
+                    auto jsn = json11::Json::parse(body, err);
+                    auto it = *(run.current_row);
+                    auto split_key = it->split.key;
+                    if (jsn[split_key].bool_value())
+                    {
+                        auto const elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_clock);
+                        auto const e = elapsed.count();
 
-    std::thread t(read_input<decltype(add_event)>, add_event);
+                        state = run.split(e) ? State::FINISH
+                                             : State::RUNNING;
+
+                    }
+                }
+            }
+
+            std::this_thread::sleep_for(100ms);
+        }
+    });
 
     timer.elapse(
             [&](){
@@ -494,6 +536,8 @@ int main()
                     clock.caption(createCaption(format_timer, mainClockToStr(e)));
                     run.refresh(e);
                 }
+
+                std::this_thread::sleep_for(50ms);
             });
 
     fm.show();

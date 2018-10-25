@@ -1,14 +1,15 @@
-#ifndef JSON_HPP_INCLUDED
-#define JSON_HPP_INCLUDED
+#include <boost/hana.hpp>
 
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
-#include <boost/hana.hpp>
 
-namespace json
-{
+#include <map>
+#include <string>
+#include <vector>
+#include <codecvt>
 
+namespace hana = boost::hana;
 
 template<typename T>
 struct Val
@@ -20,7 +21,7 @@ struct Val
 /**
  * Parse json value as int
  */
-inline int parseValue(Val<int> const& value)
+int parseValue(Val<int> const& value)
 {
     return value.v.GetInt();
 }
@@ -28,9 +29,19 @@ inline int parseValue(Val<int> const& value)
 /**
  * Parse value value as std::string
  */
-inline std::string parseValue(Val<std::string> const& value)
+std::string parseValue(Val<std::string> const& value)
 {
     return value.v.GetString();
+}
+
+/**
+ * Parse value value as std::string
+ */
+std::wstring parseValue(Val<std::wstring> const& value)
+{
+    std::string tmp = value.v.GetString();
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> myconv;
+    return myconv.from_bytes(tmp);
 }
 
 /**
@@ -58,15 +69,50 @@ T parseValue(Val<T> const& value)
     boost::hana::for_each(boost::hana::keys(t), [&](auto key) {
                 auto &member = boost::hana::at_key(t, key);
                 using ValueType = typename std::remove_reference<decltype(member)>::type;
-                char const * char_key = boost::hana::to<char const*>(key);
-                if (value.v.HasMember(char_key))
-                {
-                    member = parseValue(Val<ValueType>{value.v[boost::hana::to<char const*>(key)]});
-                }
+                member = parseValue(Val<ValueType>{value.v[boost::hana::to<char const*>(key)]});
             });
 
     return t;
 };
+
+using JsonWriter = rapidjson::Writer<rapidjson::StringBuffer>;
+
+void packValue(std::string const& value, JsonWriter & writer)
+{
+    writer.String(value.c_str());
+}
+
+void packValue(int value, JsonWriter & writer)
+{
+    writer.Int(value);
+}
+
+template<typename T>
+void packValue(std::vector<T> const& t, JsonWriter & writer)
+{
+    writer.StartArray();
+    for (auto const& e : t)
+    {
+        packValue(e, writer);
+    }
+    writer.EndArray();
+}
+
+template<typename T>
+void packValue(T const& t, JsonWriter & writer)
+{
+    writer.StartObject();
+
+    boost::hana::for_each(boost::hana::keys(t), [&](auto key) {
+                auto &member = boost::hana::at_key(t, key);
+
+                char const * json_key = boost::hana::to<char const*>(key);
+                writer.Key(json_key);
+                packValue(member, writer);
+            });
+
+    writer.EndObject();
+}
 
 template<typename T>
 T fromJson(std::string const& s)
@@ -76,6 +122,12 @@ T fromJson(std::string const& s)
     return parseValue(Val<T>{doc});
 }
 
-}
+template<typename T>
+std::string toJson(T const& value)
+{
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    packValue(value, writer);
 
-#endif
+    return buffer.GetString();
+}

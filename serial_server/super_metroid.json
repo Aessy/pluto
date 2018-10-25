@@ -1,0 +1,70 @@
+{
+    "name" : "Super Metroid Any%",
+    "splits" : [
+        {
+            "name" : "Bomb",
+            "segment_time" : 302000,
+            "best_segment" : 298000
+        },
+        {
+            "name" : "Varia",
+            "segment_time" : 651000,
+            "best_segment" : 325000
+        },
+        {
+            "name" : "Speed",
+            "segment_time" : 869000,
+            "best_segment" : 210000
+        },
+        {
+            "name" : "PB",
+            "segment_time" : 1092000,
+            "best_segment" : 206000
+        },
+        {
+            "name" : "Ghost",
+            "segment_time" : 1244000,
+            "best_segment" : 147000
+        },
+        {
+            "name" : "Gravity",
+            "segment_time" : 1407000,
+            "best_segment" : 156000
+        },
+        {
+            "name" : "Batwoon",
+            "segment_time" : 1620000,
+            "best_segment" : 196000
+        },
+        {
+            "name" : "Draygon",
+            "segment_time" : 2107000,
+            "best_segment" : 116000
+        },
+        {
+            "name" : "LN ELE",
+            "segment_time" : 2107000,
+            "best_segment" : 339000
+        },
+        {
+            "name" : "Bird no fly",
+            "segment_time" : 2284000,
+            "best_segment" : 211000
+        },
+        {
+            "name" : "G4",
+            "segment_time" : 2641000,
+            "best_segment" : 321000
+        },
+        {
+            "name" : "MB HEAD",
+            "segment_time" : 2907000,
+            "best_segment" : 244000
+        },
+        {
+            "name" : "Finito",
+            "segment_time" : 3173000,
+            "best_segment" : 265000
+        }
+    ]
+}

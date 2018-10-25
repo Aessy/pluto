@@ -1,0 +1,113 @@
+{
+    "name" : "Super Metroid Any%",
+    "splits" : [
+        {
+            "name" : "Morphing Ball",
+            "key" : "morph_ball",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Bomb",
+            "key" : "bombs",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Charge",
+            "key" : "charge",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Varia Suite",
+            "key" : "varia_suite",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Jump",
+            "key" : "high_jump",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Speed Booster",
+            "key" : "spped_booster",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Wave",
+            "key" : "wave",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Phantoon",
+            "key" : "phantoon",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "PB",
+            "key" : "pb_red_tower",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Gravity",
+            "key" : "gravity",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Batwoon",
+            "key" : "batwoon",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Draygoon",
+            "key" : "draygoon",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Plasma",
+            "key" : "plasma",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Ridley",
+            "key" : "ridley",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Golden 4",
+            "key" : "golden",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "MB1",
+            "key" : "mb1",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "MB3 Down",
+            "key" : "mb3",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
+            "name" : "Ship",
+            "key" : "ship",
+            "segment_time" : -1,
+            "best_segment" : -1
+        }
+    ]
+}
