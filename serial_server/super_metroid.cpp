@@ -47,6 +47,7 @@ uint32_t read_from_port(sp_port * port, uint32_t bytes, unsigned char * out_buff
     while (total_read != bytes)
     {
         total_read += sp_blocking_read(port, out_buffer, bytes-total_read, 4000);
+        std::cout << "Reading: " << total_read << "/" << bytes << '\n';
     }
 
     return total_read;
@@ -78,6 +79,7 @@ std::vector<unsigned char> read_sram(sp_port * port, uint32_t address, uint32_t 
 {
     auto const request = create_read_sram_request(address, bytes);
 
+    std::cout << "Serial: Writing request\n";
     auto const result = sp_blocking_write(port, request.data(), request.size(), 4000);
     if (result != request.size())
     {
@@ -85,6 +87,7 @@ std::vector<unsigned char> read_sram(sp_port * port, uint32_t address, uint32_t 
         throw std::runtime_error("Failed writing");
     }
 
+    std::cout << "Serial: Reading response\n";
     unsigned char recv_buffer[512] {};
     auto const read = read_from_port(port, sizeof(recv_buffer), recv_buffer);
     if (read != sizeof(recv_buffer))
@@ -95,6 +98,8 @@ std::vector<unsigned char> read_sram(sp_port * port, uint32_t address, uint32_t 
     uint32_t to_read {};
     std::copy(&recv_buffer[252], &recv_buffer[252]+sizeof(to_read), reinterpret_cast<char*>(&to_read));
     to_read = boost::endian::big_to_native(to_read);
+
+    std::cout << "SRAM to read: " << to_read << '\n';
     if (to_read != bytes)
     {
         throw std::runtime_error("Failed to read size");
@@ -105,6 +110,8 @@ std::vector<unsigned char> read_sram(sp_port * port, uint32_t address, uint32_t 
     {
         throw std::runtime_error("Failed reading sram");
     }
+
+    std::cout << "Read SRAM\n";
     
     return sram_buffer;
 }
@@ -140,6 +147,7 @@ static std::map<std::string, SuperMetroid> super_metroid
     ,{"draygon"      , {"Draygoon", 0x6C, 0x01}}
     ,{"ridley"       , {"Ridley", 0x6A, 0x01}}
     ,{"pb_red_tower" , {"Power Bombs (Red Tower)", 0xB5, 0x01}}
+    ,{"golden"       , {"Golden", 0x61, 0x04}}
     ,{"mb1"          , {"Mother Brain 1", 0x60, 0x04}}
     ,{"mb3"          , {"Mother Brain 3", 0x6D, 0x02}}
     ,{"ship"         , {"Ship", 0xB5, 0x01}}
@@ -150,11 +158,11 @@ static constexpr uint32_t base_address = 0xf50000;
 std::map<std::string, bool> get_sm_state(sp_port * serial_port)
 {
     static constexpr uint32_t base_items_address = base_address + 0xd7c0;
-    static constexpr uint32_t autostart_address = base_address + 0x0998;
     auto const sram = read_sram(serial_port, 0xf5d7c0, 512);
     using namespace std::chrono_literals;
-    // auto const autostart = read_sram(serial_port, 0xf50998, 64);
 
+    std::cout << "SRAM: \n";
+    print_hex()(sram);
     auto m = [](auto const& sram)
     {
         std::map<std::string, bool> state;
@@ -166,18 +174,6 @@ std::map<std::string, bool> get_sm_state(sp_port * serial_port)
         return state;
     }(sram);
 
-    /*
-    if (autostart.size() && autostart[0] == 0x1f)
-    {
-        m["autostart"] = true;
-    }
-
-    if (done.size() >= 2 && done[0] == 0xaa && done[1] == 0xf4)
-    {
-        m["ship"] = true;
-    }
-    */
-
     return m;
 }
 
@@ -185,6 +181,8 @@ bool game_started(sp_port * serial_port)
 {
     static constexpr uint32_t autostart_address = base_address + 0x0998;
     auto const autostart = read_sram(serial_port, autostart_address, 64);
+    std::cout << "SRAM: \n";
+    print_hex()(autostart);
 
     return autostart.size() && autostart[0] == 0x1f;
 }
@@ -193,7 +191,7 @@ bool entered_ship(sp_port * serial_port)
 {
     static constexpr uint32_t done_address = base_address + 0xfb2;
     auto const done = read_sram(serial_port, done_address, 64);
-
+    std::cout << "SRAM: \n";
     print_hex()(done);
 
     return done.size() >= 2 && done[0] == 0x4f && done[1] == 0xaa;

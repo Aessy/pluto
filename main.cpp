@@ -447,9 +447,16 @@ int main()
                 auto res = cli.Get("/game_started");
                 if (res && res->status == 200)
                 {
-                    state = State::RUNNING;
-                    start_clock = std::chrono::system_clock::now();
-                    run.start();
+                    auto body = res->body;
+                    std::string err;
+                    auto jsn = json11::Json::parse(body, err);
+
+                    if (jsn["started"].bool_value())
+                    {
+                        state = State::RUNNING;
+                        start_clock = std::chrono::system_clock::now();
+                        run.start();
+                    }
                 }
             }
             else if (state == State::RUNNING)

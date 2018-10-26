@@ -7,12 +7,17 @@
 #include "json11.hpp"
 #include "httplib.h"
 
-int main()
+int main(int argc, char * argv[])
 {
+    if (argc != 2)
+    {
+        std::cout << "Missing arguments\n";
+        return 0;
+    }
 
     while (true)
     {
-        auto port = open_port("/dev/ttyACM0");
+        auto port = open_port(argv[1]);
         try
         {
             std::cout << "Starting server\n";
@@ -69,7 +74,11 @@ int main()
                             return;
                         }
 
-                        rsp.status = started ? 200 : 404;
+                        std::cout << "Game started: " << started << '\n';
+
+                        auto content = json11::Json(json11::Json::object({{"started", started}})).dump();
+                        rsp.set_content(content, "json/application");
+                        rsp.status = 200;
                     });
             svr.Get("/game_ended", [&port, &mutex](auto const& req, auto & rsp)
                     {
@@ -77,20 +86,23 @@ int main()
                         bool ended = false;
                         try
                         {
-                            auto port = open_port("/dev/ttyACM0");
                             if (!port)
                             {
                                 return;
                             }
                             std::cout << "Got /game_ended \n";
                             ended = entered_ship(port.get());
+                            std::cout << "Game ended: " << ended << '\n';
+
                         } catch(std::exception const& e)
                         {
                             std::cerr << "Serial error: " << e.what() << '\n';
                             return;
                         }
 
-                        rsp.status = ended ? 200 : 404;
+                        auto content = json11::Json(json11::Json::object({{"ended", ended}})).dump();
+                        rsp.set_content(content, "json/application");
+                        rsp.status = 200;
                     });
 
             svr.listen("localhost", 8080);

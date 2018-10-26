@@ -86,6 +86,12 @@
             "best_segment" : -1
         },
         {
+            "name" : "Golden 4",
+            "key" : "golden",
+            "segment_time" : -1,
+            "best_segment" : -1
+        },
+        {
             "name" : "MB1",
             "key" : "mb1",
             "segment_time" : -1,
