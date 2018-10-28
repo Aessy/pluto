@@ -4,13 +4,14 @@
 #include <vector>
 #include <chrono>
 #include <thread>
+#include <sstream>
 
 #include <libserialport.h>
 
 #include <boost/algorithm/hex.hpp>
 #include <boost/endian/conversion.hpp>
 
-#include <json11.hpp>
+#include "json11.hpp"
 
 auto print_hex()
 {
@@ -22,15 +23,25 @@ auto print_hex()
     };
 }
 
-std::unique_ptr<sp_port, decltype(&sp_free_port)> open_port(std::string const& name)
+std::unique_ptr<sp_port, decltype(&sp_close)> open_port(std::string const& name)
 {
     sp_port * port = nullptr;
-    if (sp_get_port_by_name(name.c_str(), &port) != SP_OK)
+    auto err = sp_get_port_by_name(name.c_str(), &port);
+    if (err != SP_OK)
     {
-        throw std::runtime_error("Failed opening port");
+        throw std::runtime_error("Could not find port name");
     }
 
-    sp_open(port, SP_MODE_READ_WRITE);
+    err = sp_open(port, SP_MODE_READ_WRITE);
+    if (err != SP_OK)
+    {
+        std::ostringstream os;
+        os << "Failed opening port: " << err << '\n';
+        throw std::runtime_error(os.str());
+    }
+    static int counter = 0;
+    std::cout << "Opened port: " << counter << " number of times\n";
+    ++counter;
     sp_set_baudrate(port, 9600);
     sp_set_parity(port, SP_PARITY_NONE);
     sp_set_bits(port, 8);
@@ -38,18 +49,13 @@ std::unique_ptr<sp_port, decltype(&sp_free_port)> open_port(std::string const& n
     sp_set_dtr(port, SP_DTR_ON);
     // sp_set_dsr(port, SP_DSR_FLOW_CONTROL);
 
-    return std::unique_ptr<sp_port, decltype(&sp_free_port)>(port, sp_free_port);
+    return std::unique_ptr<sp_port, decltype(&sp_close)>(port, sp_close);
 }
 
 uint32_t read_from_port(sp_port * port, uint32_t bytes, unsigned char * out_buffer)
 {
-    uint32_t total_read {};
-    while (total_read != bytes)
-    {
-        total_read += sp_blocking_read(port, out_buffer, bytes-total_read, 4000);
-        std::cout << "Reading: " << total_read << "/" << bytes << '\n';
-    }
-
+    uint32_t total_read = sp_blocking_read(port, out_buffer, bytes, 4000);
+    std::cout << "Read: " << total_read << "/" << bytes << '\n';
     return total_read;
 }
 

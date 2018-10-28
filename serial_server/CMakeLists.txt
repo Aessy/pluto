@@ -10,4 +10,4 @@ SET(SRC super_metroid.cpp
 
 add_executable(serial_server ${SRC})
 target_compile_options(serial_server PRIVATE -std=c++17 -g)
-target_link_libraries(serial_server serialport json11 boost_system pthread)
+target_link_libraries(serial_server serialport boost_system pthread)

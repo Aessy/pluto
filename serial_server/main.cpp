@@ -17,7 +17,6 @@ int main(int argc, char * argv[])
 
     while (true)
     {
-        auto port = open_port(argv[1]);
         try
         {
             std::cout << "Starting server\n";
@@ -26,12 +25,13 @@ int main(int argc, char * argv[])
 
             std::mutex mutex;
 
-            svr.Get("/state", [&port, &mutex](auto const& req, auto & rsp)
+            svr.Get("/state", [&argv, &mutex](auto const& req, auto & rsp)
                     {
                         std::lock_guard guard(mutex);
                         json11::Json::object obj;
                         try
                         {
+                            auto port = open_port(argv[1]);
                             if (!port)
                             {
                                 return;
@@ -46,6 +46,7 @@ int main(int argc, char * argv[])
                         } catch(std::exception const& e)
                         {
                             std::cerr << "Serial error: " << e.what() << '\n';
+                            rsp.status = 404;
                             return;
                         }
 
@@ -56,12 +57,13 @@ int main(int argc, char * argv[])
                         rsp.status = 200;
                         std::cout << "Setting rsp\n";
                     });
-            svr.Get("/game_started", [&port, &mutex](auto const& req, auto & rsp)
+            svr.Get("/game_started", [&argv, &mutex](auto const& req, auto & rsp)
                     {
                         std::lock_guard<std::mutex> guard(mutex);
                         bool started = false;
                         try
                         {
+                            auto port = open_port(argv[1]);
                             if (!port)
                             {
                                 return;
@@ -71,6 +73,7 @@ int main(int argc, char * argv[])
                         } catch(std::exception const& e)
                         {
                             std::cerr << "Serial error: " << e.what() << '\n';
+                            rsp.status = 404;
                             return;
                         }
 
@@ -80,12 +83,13 @@ int main(int argc, char * argv[])
                         rsp.set_content(content, "json/application");
                         rsp.status = 200;
                     });
-            svr.Get("/game_ended", [&port, &mutex](auto const& req, auto & rsp)
+            svr.Get("/game_ended", [&argv, &mutex](auto const& req, auto & rsp)
                     {
                         std::lock_guard<std::mutex> guard(mutex);
                         bool ended = false;
                         try
                         {
+                            auto port = open_port(argv[1]);
                             if (!port)
                             {
                                 return;
@@ -97,6 +101,7 @@ int main(int argc, char * argv[])
                         } catch(std::exception const& e)
                         {
                             std::cerr << "Serial error: " << e.what() << '\n';
+                            rsp.status = 404;
                             return;
                         }
 
@@ -105,11 +110,9 @@ int main(int argc, char * argv[])
                         rsp.status = 200;
                     });
 
-            svr.listen("localhost", 8080);
+            svr.listen("192.168.1.10", 8080);
         } catch (std::exception const& e) {
             std::cerr << "Exception: " << e.what() << '\n';
         }
     }
-
-
 }
