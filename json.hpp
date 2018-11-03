@@ -101,6 +101,7 @@ void packValue(std::vector<T> const& t, JsonWriter & writer)
 template<typename T>
 void packValue(T const& t, JsonWriter & writer)
 {
+
     writer.StartObject();
 
     boost::hana::for_each(boost::hana::keys(t), [&](auto key) {
@@ -112,6 +113,7 @@ void packValue(T const& t, JsonWriter & writer)
             });
 
     writer.EndObject();
+
 }
 
 template<typename T>
@@ -127,6 +129,7 @@ std::string toJson(T const& value)
 {
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+
     packValue(value, writer);
 
     return buffer.GetString();
